@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>SkyCheck Admin</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --text: #16191d; --muted: #667080; --line: #e3e6ea;
+    --accent: #1f6feb; --accent-text: #fff; --good: #1a7f37; --warn: #9a6700; --bad: #cf222e;
+    --chip: #eef1f5; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1116; --card: #161b22; --text: #e6edf3; --muted: #8b949e; --line: #30363d;
+      --accent: #2f81f7; --chip: #21262d; --good: #3fb950; --warn: #d29922; --bad: #f85149;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--card);
+           border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 16px; margin: 0; }
+  header .who { margin-left: auto; color: var(--muted); font-size: 13px; }
+  nav { display: flex; gap: 4px; padding: 8px 20px; background: var(--card); border-bottom: 1px solid var(--line);
+        overflow-x: auto; }
+  nav button { background: none; border: 0; padding: 8px 12px; border-radius: 6px; color: var(--muted);
+               font: inherit; cursor: pointer; white-space: nowrap; }
+  nav button.on { background: var(--chip); color: var(--text); font-weight: 600; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px;
+          box-shadow: var(--shadow); margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .stat .n { font-size: 26px; font-weight: 700; }
+  .stat .l { color: var(--muted); font-size: 12px; }
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  input, select, textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+                            border-radius: 6px; padding: 7px 9px; }
+  input[type=search] { width: 100%; max-width: 420px; }
+  button.btn { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
+               padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+  button.btn:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  tr.click { cursor: pointer; }
+  tr.click:hover td { background: var(--chip); }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--chip); font-size: 12px; }
+  .chip.good { color: var(--good); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); }
+  .muted { color: var(--muted); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .stack > * + * { margin-top: 10px; }
+  .preview { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; white-space: pre-wrap;
+             word-break: break-word; max-height: 220px; overflow: auto; }
+  .photos img { width: 96px; height: 96px; object-fit: cover; border-radius: 6px; margin: 6px 6px 0 0; }
+  .err { color: var(--bad); }
+  .ok { color: var(--good); }
+  .hidden { display: none !important; }
+  #login { max-width: 360px; margin: 10vh auto; }
+  #login input { width: 100%; margin-bottom: 10px; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+           padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  @media (max-width: 640px) { .hide-sm { display: none; } }
+</style>
+</head>
+<body>
+
+<section id="login" class="card hidden">
+  <h2>SkyCheck Admin</h2>
+  <p class="muted">Sign in with your SkyCheck account. Only admin accounts can use this portal.</p>
+  <form id="login-form">
+    <input id="email" type="email" placeholder="Email" autocomplete="username" required>
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password" required>
+    <button class="btn primary" type="submit" style="width:100%">Sign in</button>
+  </form>
+  <p id="login-error" class="err"></p>
+</section>
+
+<div id="app" class="hidden">
+  <header>
+    <h1>SkyCheck Admin</h1>
+    <span class="who" id="who"></span>
+    <button class="btn" id="signout">Sign out</button>
+  </header>
+  <nav id="tabs">
+    <button data-tab="overview" class="on">Overview</button>
+    <button data-tab="users">Users</button>
+    <button data-tab="grants">Free access</button>
+    <button data-tab="reports">Reports</button>
+    <button data-tab="activity">Activity</button>
+  </nav>
+  <main>
+    <section id="tab-overview"></section>
+    <section id="tab-users" class="hidden"></section>
+    <section id="tab-grants" class="hidden"></section>
+    <section id="tab-reports" class="hidden"></section>
+    <section id="tab-activity" class="hidden"></section>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+"use strict";
+const SUPABASE_URL = "https://vuknruokaspglytxsogd.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ1a25ydW9rYXNwZ2x5dHhzb2dkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1NDE1NjcsImV4cCI6MjEwNjExNzU2N30.mSqdVIGuffD13lEZrrXZ7ppMUaQGVq5cBl945ZGnbiQ";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storageKey: "skycheck-admin" } });
+
+// ---- helpers -------------------------------------------------------------------------------------------------
+// Everything shown from the database goes through esc(): reports and posts are written by app users.
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const $ = (sel, root = document) => root.querySelector(sel);
+const fmtDate = (v) => v ? new Date(v).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
+const fmtDay = (v) => v ? new Date(v).toLocaleDateString(undefined, { dateStyle: "medium" }) : "—";
+const photoURL = (bucket, path) => `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2500); }
+
+async function api(action, params = {}) {
+  const { data, error } = await sb.functions.invoke("admin", { body: { action, ...params } });
+  if (error) {
+    let msg = error.message;
+    try { const j = await error.context.json(); if (j?.error) msg = j.error; } catch (_) {}
+    throw new Error(msg);
+  }
+  return data;
+}
+
+function proChip(u) {
+  if (u.paid) return '<span class="chip good">Paid Pro</span>';
+  if (u.has_grant) return `<span class="chip good">Free Pro${u.grant_expires ? " · until " + esc(fmtDay(u.grant_expires)) : ""}</span>`;
+  if (u.pro) return '<span class="chip good">Pro</span>';
+  return '<span class="chip">Free</span>';
+}
+const bannedChip = (u) => u.banned_until && new Date(u.banned_until) > new Date() ? ' <span class="chip bad">Banned</span>' : "";
+const adminChip = (u) => u.is_admin ? ' <span class="chip warn">Admin</span>' : "";
+const userName = (u) => u.display_name ? `${esc(u.display_name)} <span class="muted">${esc(u.email || "")}</span>` : esc(u.email || u.id);
+
+// ---- sign-in -------------------------------------------------------------------------------------------------
+async function start() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return showLogin();
+  try {
+    const me = await api("whoami");
+    $("#who").textContent = me.email;
+    $("#login").classList.add("hidden");
+    $("#app").classList.remove("hidden");
+    showTab(location.hash.slice(1) || "overview");
+  } catch (e) {
+    await sb.auth.signOut();
+    showLogin(e.message);
+  }
+}
+function showLogin(message = "") {
+  $("#app").classList.add("hidden");
+  $("#login").classList.remove("hidden");
+  $("#login-error").textContent = message;
+}
+$("#login-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("#login-error").textContent = "";
+  const { error } = await sb.auth.signInWithPassword({ email: $("#email").value.trim(), password: $("#password").value });
+  $("#password").value = "";
+  if (error) return showLogin(error.message);
+  start();
+});
+$("#signout").addEventListener("click", async () => { await sb.auth.signOut(); showLogin(); });
+
+// ---- tabs ----------------------------------------------------------------------------------------------------
+const loaders = { overview: loadOverview, users: loadUsers, grants: loadGrants, reports: loadReports, activity: loadActivity };
+function showTab(name) {
+  if (!loaders[name]) name = "overview";
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+  Object.keys(loaders).forEach((t) => $(`#tab-${t}`).classList.toggle("hidden", t !== name));
+  history.replaceState(null, "", "#" + name);
+  loaders[name]().catch((e) => { $(`#tab-${name}`).innerHTML = `<div class="card err">${esc(e.message)}</div>`; });
+}
+$("#tabs").addEventListener("click", (ev) => { const t = ev.target.closest("button")?.dataset.tab; if (t) showTab(t); });
+
+// ---- overview ------------------------------------------------------------------------------------------------
+async function loadOverview() {
+  const el = $("#tab-overview");
+  el.innerHTML = '<div class="card muted">Loading…</div>';
+  const o = await api("overview");
+  const stat = (n, l, tab) => `<div class="card stat" ${tab ? `style="cursor:pointer" data-go="${tab}"` : ""}><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`;
+  el.innerHTML = `
+    <div class="grid">
+      ${stat(o.users, "Accounts", "users")}
+      ${stat(o.new_users_7d, "New accounts (7 days)", "users")}
+      ${stat(o.active_users_7d, "Signed in (7 days)")}
+      ${stat(o.paid_pro, "Paying Pro subscribers")}
+      ${stat(o.free_access, "Free Pro access", "grants")}
+      ${stat(o.open_reports, "Open reports", "reports")}
+      ${stat(o.hidden_content, "Auto-hidden (3+ reports)", "reports")}
+      ${stat(o.active_listings, "Active listings")}
+      ${stat(o.posts_7d, "Community posts (7 days)")}
+      ${stat(o.laanc_30d, "LAANC requests (30 days)")}
+      ${stat(o.banned, "Banned accounts", "users")}
+    </div>
+    <p class="muted">Paying subscribers and revenue are also in App Store Connect › Sales and Trends.</p>`;
+  el.querySelectorAll("[data-go]").forEach((c) => c.addEventListener("click", () => showTab(c.dataset.go)));
+}
+
+// ---- users ---------------------------------------------------------------------------------------------------
+let searchTimer = null;
+async function loadUsers() {
+  const el = $("#tab-users");
+  if (!$("#user-search", el)) {
+    el.innerHTML = `
+      <div class="card">
+        <div class="row"><input id="user-search" type="search" placeholder="Search by email, name or user ID"></div>
+        <div id="user-list" style="margin-top:12px"></div>
+      </div>
+      <div id="user-detail"></div>`;
+    $("#user-search").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(searchUsers, 300); });
+  }
+  await searchUsers();
+}
+async function searchUsers() {
+  const list = $("#user-list");
+  list.innerHTML = '<span class="muted">Loading…</span>';
+  const users = await api("users", { query: $("#user-search").value });
+  if (!users.length) { list.innerHTML = '<span class="muted">No accounts found.</span>'; return; }
+  list.innerHTML = `<table><thead><tr><th>Account</th><th>Access</th><th class="hide-sm">Sign-in</th><th class="hide-sm">Joined</th><th class="hide-sm">Last seen</th></tr></thead><tbody>
+    ${users.map((u) => `<tr class="click" data-id="${esc(u.id)}"><td>${userName(u)}${adminChip(u)}</td><td>${proChip(u)}${bannedChip(u)}</td>
+      <td class="hide-sm">${esc(u.provider || "")}</td><td class="hide-sm">${esc(fmtDay(u.created_at))}</td><td class="hide-sm">${esc(fmtDay(u.last_sign_in_at))}</td></tr>`).join("")}
+  </tbody></table>`;
+  list.querySelectorAll("tr.click").forEach((tr) => tr.addEventListener("click", () => openUser(tr.dataset.id)));
+}
+
+async function openUser(id) {
+  const box = $("#user-detail");
+  box.innerHTML = '<div class="card muted">Loading…</div>';
+  box.scrollIntoView({ behavior: "smooth" });
+  const d = await api("user", { userId: id });
+  const u = d.user;
+  const banned = u.banned_until && new Date(u.banned_until) > new Date();
+  const sub = d.subscription;
+  const activeGrants = d.grants.filter((g) => !g.revoked_at && (!g.expires_at || new Date(g.expires_at) > new Date()));
+  box.innerHTML = `
+    <div class="card stack">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">${userName(u)}${adminChip(u)}</h2>${proChip(u)}${bannedChip(u)}</div>
+      <div class="muted">ID ${esc(u.id)} · signed in with ${esc(u.provider || "?")} · joined ${esc(fmtDate(u.created_at))} · last seen ${esc(fmtDate(u.last_sign_in_at))}</div>
+      <div class="muted">${esc(d.counts.posts)} community posts · ${esc(d.counts.listings)} listings · ${esc(d.counts.reports)} reports against them</div>
+      <div><b>Subscription:</b> ${sub ? `${esc(sub.product_id)} · ${esc(sub.status)} · ${sub.expires_at ? (sub.auto_renew ? "renews " : "ends ") + esc(fmtDay(sub.expires_at)) : ""} · ${esc(sub.store)} ${esc(sub.environment)}${String(sub.original_transaction_id).startsWith("manual-") ? ' <span class="chip">old manual grant</span>' : ""}` : '<span class="muted">none</span>'}</div>
+    </div>
+    <div class="card stack">
+      <h2>Free Pro access</h2>
+      ${activeGrants.length ? `<table><thead><tr><th>Until</th><th>Reason</th><th>Given</th><th></th></tr></thead><tbody>
+        ${activeGrants.map((g) => `<tr><td>${g.expires_at ? esc(fmtDay(g.expires_at)) : "No end date"}</td><td>${esc(g.reason)}</td><td>${esc(fmtDay(g.created_at))}</td>
+          <td><button class="btn danger" data-revoke="${esc(g.id)}">Revoke</button></td></tr>`).join("")}</tbody></table>` : '<span class="muted">No free access right now.</span>'}
+      <div class="row">
+        <select id="grant-days">
+          <option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option>
+          <option value="365">1 year</option><option value="">No end date</option><option value="custom">Custom…</option>
+        </select>
+        <input id="grant-custom" type="number" min="1" max="3650" placeholder="Days" class="hidden" style="width:90px">
+        <input id="grant-reason" placeholder="Reason (e.g. tester, partner)" maxlength="200" style="flex:1;min-width:180px">
+        <button class="btn primary" id="grant-btn">Give free Pro</button>
+      </div>
+    </div>
+    <div class="card stack">
+      <h2>Account access</h2>
+      ${u.is_admin ? '<span class="muted">Admins can\'t be banned here.</span>' : banned
+        ? `<div>Banned until ${esc(fmtDate(u.banned_until))}.</div><div><button class="btn" id="unban-btn">Lift ban</button></div>`
+        : `<div class="row"><select id="ban-hours"><option value="24">1 day</option><option value="168">7 days</option><option value="720">30 days</option><option value="">Permanently</option></select>
+           <input id="ban-reason" placeholder="Reason" maxlength="200" style="flex:1;min-width:180px"><button class="btn danger" id="ban-btn">Ban from signing in</button></div>
+           <div class="muted">A banned account can't sign in or refresh its session; content stays until you remove it in Reports.</div>`}
+    </div>`;
+  $("#grant-days").addEventListener("change", (e) => $("#grant-custom").classList.toggle("hidden", e.target.value !== "custom"));
+  $("#grant-btn").addEventListener("click", async () => {
+    const sel = $("#grant-days").value;
+    const days = sel === "custom" ? Number($("#grant-custom").value) : sel === "" ? null : Number(sel);
+    if (sel === "custom" && !(days >= 1)) return toast("Enter the number of days");
+    await act(() => api("grant", { userId: id, days, reason: $("#grant-reason").value }), "Free Pro given");
+    openUser(id); searchUsers();
+  });
+  box.querySelectorAll("[data-revoke]").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("Revoke this free access? They lose Pro right away unless they also pay.")) return;
+    await act(() => api("revoke_grant", { grantId: b.dataset.revoke }), "Free access revoked");
+    openUser(id); searchUsers();
+  }));
+  $("#ban-btn")?.addEventListener("click", async () => {
+    const h = $("#ban-hours").value;
+    if (!confirm(`Ban ${u.email || "this account"} ${h ? "for " + $("#ban-hours").selectedOptions[0].text : "permanently"}?`)) return;
+    await act(() => api("ban", { userId: id, hours: h ? Number(h) : null, reason: $("#ban-reason").value }), "Account banned");
+    openUser(id); searchUsers();
+  });
+  $("#unban-btn")?.addEventListener("click", async () => {
+    await act(() => api("unban", { userId: id }), "Ban lifted");
+    openUser(id); searchUsers();
+  });
+}
+
+async function act(fn, done) {
+  try { await fn(); toast(done); } catch (e) { toast(e.message); throw e; }
+}
+
+// ---- free access list ----------------------------------------------------------------------------------------
+async function loadGrants() {
+  const el = $("#tab-grants");
+  el.innerHTML = '<div class="card muted">Loading…</div>';
+  const rows = await api("grants");
+  el.innerHTML = `<div class="card">
+    <h2>Free Pro access (${rows.length})</h2>
+    <p class="muted">To give someone free Pro, find their account under Users. They need a SkyCheck account first: ask them to sign in to the app once.</p>
+    ${rows.length ? `<table><thead><tr><th>Account</th><th>Until</th><th>Reason</th><th class="hide-sm">Given by</th><th></th></tr></thead><tbody>
+      ${rows.map((g) => `<tr><td><a href="#" data-user="${esc(g.user_id)}">${esc(g.user_id_label || g.user_id)}</a></td>
+        <td>${g.expires_at ? esc(fmtDay(g.expires_at)) : "No end date"}</td><td>${esc(g.reason)}</td>
+        <td class="hide-sm">${esc(g.granted_by_label || "—")}</td><td><button class="btn danger" data-revoke="${esc(g.id)}">Revoke</button></td></tr>`).join("")}
+    </tbody></table>` : '<span class="muted">Nobody has free access.</span>'}</div>`;
+  el.querySelectorAll("[data-revoke]").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("Revoke this free access?")) return;
+    await act(() => api("revoke_grant", { grantId: b.dataset.revoke }), "Free access revoked");
+    loadGrants();
+  }));
+  el.querySelectorAll("[data-user]").forEach((a) => a.addEventListener("click", (ev) => { ev.preventDefault(); goToUser(a.dataset.user); }));
+}
+async function goToUser(id) {
+  showTab("users");
+  await new Promise((r) => setTimeout(r, 50));
+  openUser(id);
+}
+
+// ---- reports -------------------------------------------------------------------------------------------------
+async function loadReports() {
+  const el = $("#tab-reports");
+  if (!$("#report-status", el)) {
+    el.innerHTML = `<div class="card row"><b>Reports</b>
+      <select id="report-status"><option value="open">Open</option><option value="actioned">Actioned</option><option value="dismissed">Dismissed</option></select>
+      <span class="muted">Apple expects reports to be handled within 24 hours. Content with 3+ reports is hidden automatically until you decide.</span></div>
+      <div id="report-list"></div>`;
+    $("#report-status").addEventListener("change", listReports);
+  }
+  await listReports();
+}
+async function listReports() {
+  const list = $("#report-list");
+  list.innerHTML = '<div class="card muted">Loading…</div>';
+  const status = $("#report-status").value;
+  const rows = await api("reports", { status });
+  if (!rows.length) { list.innerHTML = `<div class="card muted">No ${esc(status)} reports.</div>`; return; }
+  list.innerHTML = rows.map((r) => {
+    let what = "", body = "", contentStatus = "", photos = [], bucket = "";
+    if (r.kind === "community") {
+      if (r.comment) { what = "Comment"; body = r.comment.body; contentStatus = r.comment.status; }
+      else if (r.post) { what = "Post"; body = `${r.post.title ?? ""}\n\n${r.post.body ?? ""}`; contentStatus = r.post.status; photos = r.post.photo_paths || []; bucket = "community-photos"; }
+      else what = "Deleted community content";
+    } else {
+      if (r.listing) { what = "Listing"; body = `${r.listing.title ?? ""} · $${((r.listing.price_cents || 0) / 100).toFixed(2)}\n\n${r.listing.description ?? ""}`; contentStatus = r.listing.status; photos = r.listing.photo_paths || []; bucket = "listing-photos"; }
+      else if (r.message) { what = "Chat message"; body = r.message.body; }
+      else what = "Deleted marketplace content";
+    }
+    const canRemove = status === "open" && contentStatus && contentStatus !== "removed";
+    const canRestore = contentStatus === "hidden" || (status !== "open" && contentStatus === "removed");
+    return `<div class="card stack">
+      <div class="row" style="justify-content:space-between">
+        <div><span class="chip">${r.kind === "community" ? "Community" : "Marketplace"}</span> <b>${esc(what)}</b>
+          reported for <span class="chip warn">${esc(r.reason)}</span>${contentStatus ? ` · now <span class="chip ${contentStatus === "removed" ? "bad" : contentStatus === "hidden" ? "warn" : ""}">${esc(contentStatus)}</span>` : ""}</div>
+        <span class="muted">${esc(fmtDate(r.created_at))}</span>
+      </div>
+      ${r.details ? `<div><b>Reporter says:</b> ${esc(r.details)}</div>` : ""}
+      ${body ? `<div class="preview">${esc(body)}</div>` : ""}
+      ${photos.length ? `<div class="photos">${photos.slice(0, 6).map((p) => `<a href="${esc(photoURL(bucket, p))}" target="_blank" rel="noopener noreferrer"><img src="${esc(photoURL(bucket, p))}" alt="" loading="lazy"></a>`).join("")}</div>` : ""}
+      <div class="muted">Reported by ${esc(r.reporter_id_label || r.reporter_id || "—")}${r.reported_user_id ? ` · about <a href="#" data-user="${esc(r.reported_user_id)}">${esc(r.reported_user_id_label || r.reported_user_id)}</a>` : ""}</div>
+      <div class="row">
+        ${canRemove ? `<button class="btn danger" data-resolve="remove" data-kind="${esc(r.kind)}" data-id="${esc(r.id)}">Remove ${esc(what.toLowerCase())}</button>` : ""}
+        ${canRestore ? `<button class="btn" data-resolve="restore" data-kind="${esc(r.kind)}" data-id="${esc(r.id)}">Restore (it's fine)</button>` : ""}
+        ${status === "open" ? `<button class="btn" data-resolve="dismiss" data-kind="${esc(r.kind)}" data-id="${esc(r.id)}">Dismiss report</button>` : ""}
+        ${r.reported_user_id ? `<button class="btn" data-user="${esc(r.reported_user_id)}">Open account…</button>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+  list.querySelectorAll("[data-resolve]").forEach((b) => b.addEventListener("click", async () => {
+    const d = b.dataset.resolve;
+    if (d === "remove" && !confirm("Remove this content for everyone?")) return;
+    await act(() => api("resolve", { kind: b.dataset.kind, reportId: b.dataset.id, decision: d }),
+      d === "remove" ? "Removed" : d === "restore" ? "Restored" : "Report dismissed");
+    listReports();
+  }));
+  list.querySelectorAll("[data-user]").forEach((a) => a.addEventListener("click", (ev) => { ev.preventDefault(); goToUser(a.dataset.user); }));
+}
+
+// ---- activity ------------------------------------------------------------------------------------------------
+const actionNames = {
+  grant_free_access: "Gave free Pro", revoke_free_access: "Revoked free Pro", ban_user: "Banned", unban_user: "Lifted ban",
+  report_remove: "Removed reported content", report_restore: "Restored reported content", report_dismiss: "Dismissed report",
+};
+async function loadActivity() {
+  const el = $("#tab-activity");
+  el.innerHTML = '<div class="card muted">Loading…</div>';
+  const rows = await api("activity");
+  el.innerHTML = `<div class="card"><h2>Admin activity</h2>
+    ${rows.length ? `<table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Account</th><th class="hide-sm">Details</th></tr></thead><tbody>
+      ${rows.map((a) => `<tr><td>${esc(fmtDate(a.created_at))}</td><td>${esc(a.admin_id_label || "—")}</td><td>${esc(actionNames[a.action] || a.action)}</td>
+        <td>${a.target_user ? `<a href="#" data-user="${esc(a.target_user)}">${esc(a.target_user_label || a.target_user)}</a>` : "—"}</td>
+        <td class="hide-sm muted">${esc(Object.entries(a.details || {}).filter(([k, v]) => v !== null && v !== "" && !/_id$/.test(k) && k !== "target").map(([k, v]) => `${k}: ${v}`).join(" · "))}</td></tr>`).join("")}
+    </tbody></table>` : '<span class="muted">Nothing yet.</span>'}</div>`;
+  el.querySelectorAll("[data-user]").forEach((a) => a.addEventListener("click", (ev) => { ev.preventDefault(); goToUser(a.dataset.user); }));
+}
+
+sb.auth.onAuthStateChange((event) => { if (event === "SIGNED_OUT") showLogin(); });
+start();
+</script>
+</body>
+</html>
